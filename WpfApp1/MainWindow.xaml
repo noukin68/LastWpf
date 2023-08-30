@@ -51,10 +51,10 @@
             Margin="10"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Orientation="Horizontal" Margin="10">
+        <!--<StackPanel Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Orientation="Horizontal" Margin="10">
             <materialDesign:PackIcon  x:Name="ConnectionStatusIcon" Kind="SmartphoneLinkOff" VerticalAlignment="Center" Margin="0,0,5,0"/>
             <TextBlock x:Name="AuthText" Text="Устройство не сопряжено" VerticalAlignment="Center"/>
-        </StackPanel>
+        </StackPanel> -->
 
     </Grid>
 </Window>

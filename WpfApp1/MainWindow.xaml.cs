@@ -19,6 +19,8 @@ using System.Runtime.InteropServices;
 using System.Linq;
 using System.Windows.Media;
 using System.Net.Sockets;
+using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace WpfApp1
 {
@@ -46,6 +48,18 @@ namespace WpfApp1
             uidText.Text = "UID: " + uid;
             SaveUidToServerAsync(uid);
             SetHighPriority();
+            UpdateAppStatusAsync(true);
+        }
+
+        private async void UpdateAppStatusAsync(bool running)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                var data = new { running };
+                var content = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync("http://62.217.182.138:3000/updateAppStatus", content);
+                response.EnsureSuccessStatusCode();
+            }
         }
 
         private void Initialize()
@@ -84,6 +98,7 @@ namespace WpfApp1
 
         private async void ShowQuestion(int index)
         {
+            LockKeyboard();
             if (index < questionnaire.Questions.Count)
             {
                 Question question = questionnaire.Questions[index];
@@ -116,7 +131,6 @@ namespace WpfApp1
                 HttpClient client = new HttpClient();
                 var response = await client.GetAsync("http://62.217.182.138:3000/notify");
                 answerStackPanel.Children.Clear();
-                LockKeyboard();
             }
         }
 
@@ -179,8 +193,6 @@ namespace WpfApp1
 
                 await Task.Delay(1500);
 
-                button.Background = Brushes.Transparent;
-
                 foreach (UIElement child in answerStackPanel.Children)
                 {
                     if (child is StackPanel buttonStackPanel)
@@ -200,12 +212,12 @@ namespace WpfApp1
             }
         }
 
-        private async Task ShowInitialWindowStateAsync()
+        private async void ShowInitialWindowStateAsync()
         {
             HttpClient client = new HttpClient();
-            var response = await client.GetAsync("http://62.217.182.138:3000/restartTimer");
-            this.WindowState = WindowState.Normal;
-            this.HideToTray();
+            await client.GetAsync("http://62.217.182.138:3000/restartTimer");
+            WindowState = WindowState.Normal;
+            HideToTray();
             answerStackPanel.Children.Clear();
             textBlock.Text = "";
             currentQuestionIndex = 0;
@@ -227,23 +239,23 @@ namespace WpfApp1
         {
             socket = new SocketIO("http://62.217.182.138:3000");
             socket.On("time-received", (response) => { int timeInSeconds = response.GetValue<int>(); Dispatcher.Invoke(() => { StartTimer(timeInSeconds); }); });
-            socket.On("uid-authorized", (data) => { Dispatcher.Invoke(() => { AuthStatusText("Соединение установлено"); UpdateConnectionStatusIcon(true); }); });
+            //socket.On("uid-authorized", (data) => { Dispatcher.Invoke(() => { AuthStatusText("Соединение установлено"); UpdateConnectionStatusIcon(true); }); });
             //socket.OnDisconnected += (sender, e) => { Dispatcher.Invoke(() => { AuthStatusText("Соединение разорвано"); UpdateConnectionStatusIcon(false); }); };
             socket.On("continue-work", (data) => { HandleAppMinimize(); });
             socket.On("finish-work", (data) => { HandleAppFinish(); });
             socket.ConnectAsync();
         }
 
-        private void HandleAppMinimize() { this.Dispatcher.Invoke(() => { UnlockKeyboard(); textBlock.Text = ""; HideToTray(); }); }
+        private void HandleAppMinimize() { this.Dispatcher.Invoke(() => { WindowState = WindowState.Normal; UnlockKeyboard(); textBlock.Text = ""; HideToTray(); }); }
         private void HandleAppFinish() { this.Dispatcher.Invoke(() => { UnlockKeyboard(); System.Diagnostics.Process.Start("shutdown", "/s /t 0"); }); }
 
-        private void AuthStatusText(string text) { AuthText.Text = text; }
+        /*private void AuthStatusText(string text) { AuthText.Text = text; }
 
         private void UpdateConnectionStatusIcon(bool isConnected)
         {
             if (isConnected) { ConnectionStatusIcon.Kind = MaterialDesignThemes.Wpf.PackIconKind.SmartphoneLink; }
             else { ConnectionStatusIcon.Kind = MaterialDesignThemes.Wpf.PackIconKind.SmartphoneLinkOff; }
-        }
+        } */
 
         private void StartTimer(int timeInSeconds)
         {
@@ -263,7 +275,7 @@ namespace WpfApp1
                     currentQuestionIndex = 0;
                     correctAnswers = 0;
                     ShowQuestion(currentQuestionIndex);
-                    WindowState = WindowState.Normal;
+                    WindowState = WindowState.Maximized;
                     Topmost = true;
                 }
             };
@@ -274,10 +286,13 @@ namespace WpfApp1
         protected override void OnClosed(EventArgs e) { ConnectToServer(false); base.OnClosed(e); }
         public MainWindow(IntPtr hWnd) : this() { WindowInteropHelper helper = new WindowInteropHelper(this); helper.Owner = hWnd;}
         private void Window_StateChanged(object sender, EventArgs e) { if (WindowState == WindowState.Minimized) { WindowState = WindowState.Normal; Topmost = true; } }
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e) { e.Cancel = true; HideToTray(); }
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e) {
+            e.Cancel = true;
+            HideToTray();
+        }
         private void Window_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e) { try { DragMove(); } catch (Exception) {} }
         private void MinimizeBtn(object sender, RoutedEventArgs e) { WindowState = WindowState.Minimized; }
-        private void CloseBtn(object sender, RoutedEventArgs e) { Close(); }
+        private void CloseBtn(object sender, RoutedEventArgs e) { Close(); UpdateAppStatusAsync(false); }
 
         private async void SaveUidToServerAsync(string uid)
         {

@@ -127,6 +127,7 @@ namespace WpfApp1
             }
             else
             {
+                await Task.Delay(1500);
                 textBlock.Text = $"Тест завершен и уведомление было отправлено";
                 HttpClient client = new HttpClient();
                 var response = await client.GetAsync("http://62.217.182.138:3000/notify");
